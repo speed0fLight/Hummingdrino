@@ -1,4 +1,4 @@
-Import("env")
+Import("env") # type: ignore
 
 from pathlib import Path
 
@@ -13,7 +13,7 @@ libraries = (
         Path("PX4Flow.cpp"),
     ),
 )
-dependency_dir = Path(env.subst("$PROJECT_LIBDEPS_DIR")) / env.subst("$PIOENV")
+dependency_dir = Path(env.subst("$PROJECT_LIBDEPS_DIR")) / env.subst("$PIOENV") # type: ignore
 
 for library, relative_path in libraries:
     library_source = dependency_dir / library / relative_path
