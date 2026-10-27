@@ -10,8 +10,9 @@ static IMU imu;
 static IMUReading latestImuReading;
 static bool imuReady = false;
 
+// Setup the gyro, compass, accelerometer
 void setup() {
-  Serial3.begin(115200);
+  Serial1.begin(115200);
   Wire.begin();
   Wire.setClock(400000);
 
@@ -20,19 +21,16 @@ void setup() {
   Shitfuck configs from config file into setup functions.
   */
 
-  // Rn we hardware test yippie!!1!1!
-
+  // Run inits and set init ready states
   imuReady = imu.begin();
-  const IMUStatus& imuStatus = imu.status();
-  if (!imuStatus.mpu6050Ready) {
-    Serial3.print("MPU6050 initialization failed: ");
-    Serial3.println(imuStatus.mpu6050Error);
-  }
-  if (!imuStatus.qmc5883lReady) {
-    Serial3.print("QMC5883L initialization failed: ");
-    Serial3.println(imuStatus.qmc5883lError);
-  }
 
+  // Check states and explode if not ready (or just try something again)
+  if (!imuReady)
+  {
+    Serial1.println("Failed to initialize inertial measurement unit.");
+
+    return;
+  }
 }
 
 void loop() {
@@ -43,22 +41,34 @@ void loop() {
   It can compile all required info to output to motors + all relevant safety from other modules.
   This will dictate if it wants to enable motors or not and forward to motors its output.
   */
-  if (!imuReady) {
-    delay(100);
-    return;
-  }
 
-  if (!imu.read(latestImuReading)) {
-    imuReady = false;
-    Serial3.println("IMU read fail.");
-  } else {
-    Serial3.println("IMU reading acceleration: " + String(latestImuReading.acceleration.x) + ", " + String(latestImuReading.acceleration.y) + ", " + String(latestImuReading.acceleration.z));
-    Serial3.println("IMU reading angular rate: " + String(latestImuReading.angularRate.x) + ", " + String(latestImuReading.angularRate.y) + ", " + String(latestImuReading.angularRate.z));
-  }
+  iterateSystems();
+
+
   
 }
 
 // put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+
+
+ /*
+  * iterateSystems: **Important**! This function iterates through
+  * the flight controller components (IMU) and retrieves data.
+  * Error codes and behavior
+  * Error 2 - Reset the loop
+  *
+  */
+int iterateSystems() {
+  
+   // ------ IMU (Gyro + Accelerometer + Compass + Barometer) ------
+  if (!imu.read(latestImuReading)) {
+    imuReady = false;
+    Serial1.println("IMU read fail.");
+  } else {
+    Serial1.println("IMU reading acceleration: " + String(latestImuReading.acceleration.x) + ", " + String(latestImuReading.acceleration.y) + ", " + String(latestImuReading.acceleration.z));
+    Serial1.println("IMU reading angular rate: " + String(latestImuReading.angularRate.x) + ", " + String(latestImuReading.angularRate.y) + ", " + String(latestImuReading.angularRate.z));
+  }
+
+  return 0;
 }
+

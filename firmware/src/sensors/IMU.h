@@ -34,6 +34,7 @@ class IMU {
 public:
 	bool begin();
 	bool read(IMUReading& reading);
+	int getErrorStatus();
 	const IMUStatus& status() const;
 
 private:

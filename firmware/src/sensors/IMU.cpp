@@ -61,6 +61,14 @@ bool IMU::read(IMUReading& reading) {
 	return true;
 }
 
+int IMU::getErrorStatus() {
+	if (currentStatus.mpu6050Error != 0) 
+		return 2;
+	if (currentStatus.qmc5883lError != 0) 
+		return 1;
+	return 0;
+}
+
 const IMUStatus& IMU::status() const {
 	return currentStatus;
 }
