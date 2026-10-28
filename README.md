@@ -14,3 +14,6 @@ We'll need these components to interface them with the Arduino Uno Q.
 5. RC Reciever PWM Inputs
 6. LIDAR-Lite Rangefinder (Likely will be changed due to [known issues](https://ardupilot.org/copter/docs/common-rangefinder-lidarlite.html#problems-with-the-lidar-lite-v1-v2))
 7. 
+
+## Credits
+1. [lobodol](https://github.com/lobodol/drone-flight-controller/tree/main)
