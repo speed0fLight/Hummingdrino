@@ -11,6 +11,6 @@ We'll need these components to interface them with the Arduino Uno Q.
 2. QMC5883L/P 3-Axis Magnetometer (Combined in a GY-87 board)
 3. BMP180 Barometric Pressure & Altitude Sensor or similar (Combined in a GY-87 board)
 4. PX4Flow Optical Flow Sensor
-5. FlySky RC Reciever
+5. RC Reciever PWM Inputs
 6. LIDAR-Lite Rangefinder (Likely will be changed due to [known issues](https://ardupilot.org/copter/docs/common-rangefinder-lidarlite.html#problems-with-the-lidar-lite-v1-v2))
 7. 

@@ -12,10 +12,6 @@ libraries = (
         "arduino-px4flow-i2c",
         Path("PX4Flow.cpp"),
     ),
-    (
-        "IBusMB",
-        Path("IBusBM.cpp"),
-    )
 )
 dependency_dir = Path(env.subst("$PROJECT_LIBDEPS_DIR")) / env.subst("$PIOENV") # type: ignore
 
