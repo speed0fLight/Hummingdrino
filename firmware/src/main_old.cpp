@@ -1,3 +1,4 @@
+/*
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -16,10 +17,7 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
 
-  /*
-  Solo module setup and initialization.
-  Shitfuck configs from config file into setup functions.
-  */
+
 
   // Run inits and set init ready states
   imuReady = imu.begin();
@@ -33,31 +31,10 @@ void setup() {
   }
 }
 
-void loop() {
-  /*
-  Run each module with inputs and outputs funnily (new verity variant)
-  Do we run safety checks here before outputting to motors?
-  I think a failsafe module with all safety checks is best.
-  It can compile all required info to output to motors + all relevant safety from other modules.
-  This will dictate if it wants to enable motors or not and forward to motors its output.
-  */
-
-  iterateSystems();
-
-
-  
-}
-
 // put function definitions here:
 
 
- /*
-  * iterateSystems: **Important**! This function iterates through
-  * the flight controller components (IMU) and retrieves data.
-  * Error codes and behavior
-  * Error 2 - Reset the loop
-  *
-  */
+
 int iterateSystems() {
   
    // ------ IMU (Gyro + Accelerometer + Compass + Barometer) ------
@@ -72,3 +49,12 @@ int iterateSystems() {
   return 0;
 }
 
+void loop() {
+
+
+  iterateSystems();
+
+
+  
+}
+*/

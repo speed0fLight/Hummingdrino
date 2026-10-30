@@ -142,71 +142,6 @@ void initEscs() {
 }
 
 /**
- * Setup configuration
- */
-void setup() {
-    initEscs();
-
-    // Start I2C communication
-    Wire.begin();
-    Wire.setClock(400000);
-
-    // Turn LED on during setup
-    pinMode(13, OUTPUT);
-    digitalWrite(13, HIGH);
-
-    setupMpu6050Registers();
-
-    calibrateMpu6050();
-
-    configureChannelMapping();
-
-    // Capture receiver pulse edges using the board's Arduino interrupt API.
-    for (uint8_t pin : RECEIVER_PINS) {
-        pinMode(pin, INPUT);
-    }
-    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL1]), onChannel1Change, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL2]), onChannel2Change, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL3]), onChannel3Change, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL4]), onChannel4Change, CHANGE);
-
-    period = (1000000/FREQ) ; // Sampling period in µs
-
-    // Initialize loop_timer
-    loop_timer = micros();
-
-    // Turn LED off now setup is done
-    digitalWrite(13, LOW);
-}
-
-/**
- * Main program loop
- */
-void loop() {
-    // 1. First, read raw values from MPU-6050
-    readSensor();
-
-    // 2. Calculate angles from gyro & accelerometer's values
-    calculateAngles();
-
-    // 3. Calculate set points of PID controller
-    calculateSetPoints();
-
-    // 4. Calculate errors comparing angular motions to set points
-    calculateErrors();
-
-    if (isStarted()) {
-        // 5. Calculate motors speed with PID controller
-        pidController();
-
-        compensateBatteryDrop();
-    }
-
-    // 6. Apply motors speed
-    applyMotorSpeed();
-}
-
-/**
  * Generate ESC signals on digital pins #4 #5 #6 #7 with a frequency of 250Hz (4ms period).
  * GPIO writes use the portable Arduino API instead of board-specific port registers.
  *
@@ -270,35 +205,6 @@ void readSensor() {
     gyro_raw[X] = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the gyro_raw[X] variable
     gyro_raw[Y] = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the gyro_raw[Y] variable
     gyro_raw[Z] = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the gyro_raw[Z] variable
-}
-
-/**
- * Calculate real angles from gyro and accelerometer's values
- */
-void calculateAngles() {
-    calculateGyroAngles();
-    calculateAccelerometerAngles();
-
-    if (initialized) {
-        // Correct the drift of the gyro with the accelerometer
-        gyro_angle[X] = gyro_angle[X] * 0.9996 + acc_angle[X] * 0.0004;
-        gyro_angle[Y] = gyro_angle[Y] * 0.9996 + acc_angle[Y] * 0.0004;
-    } else {
-        // At very first start, init gyro angles with accelerometer angles
-        resetGyroAngles();
-
-        initialized = true;
-    }
-
-    // To dampen the pitch and roll angles a complementary filter is used
-    measures[ROLL]  = measures[ROLL]  * 0.9 + gyro_angle[X] * 0.1;
-    measures[PITCH] = measures[PITCH] * 0.9 + gyro_angle[Y] * 0.1;
-    measures[YAW]   = -gyro_raw[Z] / SSF_GYRO; // Store the angular motion for this axis
-
-    // Apply low-pass filter (10Hz cutoff frequency)
-    angular_motions[ROLL]  = 0.7 * angular_motions[ROLL]  + 0.3 * gyro_raw[X] / SSF_GYRO;
-    angular_motions[PITCH] = 0.7 * angular_motions[PITCH] + 0.3 * gyro_raw[Y] / SSF_GYRO;
-    angular_motions[YAW]   = 0.7 * angular_motions[YAW]   + 0.3 * gyro_raw[Z] / SSF_GYRO;
 }
 
 /**
@@ -387,6 +293,44 @@ void pidController() {
     pulse_length_esc2 = minMax(pulse_length_esc2, 1100, 2000);
     pulse_length_esc3 = minMax(pulse_length_esc3, 1100, 2000);
     pulse_length_esc4 = minMax(pulse_length_esc4, 1100, 2000);
+}
+
+/**
+ * Reset gyro's angles with accelerometer's angles.
+ */
+void resetGyroAngles() {
+    gyro_angle[X] = acc_angle[X];
+    gyro_angle[Y] = acc_angle[Y];
+}
+
+/**
+ * Calculate real angles from gyro and accelerometer's values
+ */
+
+void calculateAngles() {
+    calculateGyroAngles();
+    calculateAccelerometerAngles();
+
+    if (initialized) {
+        // Correct the drift of the gyro with the accelerometer
+        gyro_angle[X] = gyro_angle[X] * 0.9996 + acc_angle[X] * 0.0004;
+        gyro_angle[Y] = gyro_angle[Y] * 0.9996 + acc_angle[Y] * 0.0004;
+    } else {
+        // At very first start, init gyro angles with accelerometer angles
+        resetGyroAngles();
+
+        initialized = true;
+    }
+
+    // To dampen the pitch and roll angles a complementary filter is used
+    measures[ROLL]  = measures[ROLL]  * 0.9 + gyro_angle[X] * 0.1;
+    measures[PITCH] = measures[PITCH] * 0.9 + gyro_angle[Y] * 0.1;
+    measures[YAW]   = -gyro_raw[Z] / SSF_GYRO; // Store the angular motion for this axis
+
+    // Apply low-pass filter (10Hz cutoff frequency)
+    angular_motions[ROLL]  = 0.7 * angular_motions[ROLL]  + 0.3 * gyro_raw[X] / SSF_GYRO;
+    angular_motions[PITCH] = 0.7 * angular_motions[PITCH] + 0.3 * gyro_raw[Y] / SSF_GYRO;
+    angular_motions[YAW]   = 0.7 * angular_motions[YAW]   + 0.3 * gyro_raw[Z] / SSF_GYRO;
 }
 
 /**
@@ -517,47 +461,6 @@ bool isYawCentered() {
 }
 
 /**
- * Return whether the quadcopter is started.
- * To start the quadcopter, move the left stick in bottom left corner then, move it back in center position.
- * To stop the quadcopter move the left stick in bottom right corner.
- *
- * @return bool
- */
-bool isStarted() {
-    // When left stick is moved in the bottom left corner
-    if (status == STOPPED && pulse_length[mode_mapping[YAW]] <= 1012 && isThrottleIdle()) {
-        status = STARTING;
-    }
-
-    // When left stick is moved back in the center position
-    if (status == STARTING && isYawCentered() && isThrottleIdle()) {
-        status = STARTED;
-
-        // Reset PID controller's variables to prevent bump start
-        resetPidController();
-
-        resetGyroAngles();
-    }
-
-    // When left stick is moved in the bottom right corner
-    if (status == STARTED && pulse_length[mode_mapping[YAW]] >= 1988 && isThrottleIdle()) {
-        status = STOPPED;
-        // Make sure to always stop motors when status is STOPPED
-        stopAll();
-    }
-
-    return status == STARTED;
-}
-
-/**
- * Reset gyro's angles with accelerometer's angles.
- */
-void resetGyroAngles() {
-    gyro_angle[X] = acc_angle[X];
-    gyro_angle[Y] = acc_angle[Y];
-}
-
-/**
  * Reset motors' pulse length to 1000µs to totally stop them.
  */
 void stopAll() {
@@ -593,17 +496,37 @@ void calculateSetPoints() {
     pid_set_points[ROLL]  = calculateSetPoint(measures[ROLL], pulse_length[mode_mapping[ROLL]]);
 }
 
-
 /**
- * Compensate battery drop applying a coefficient on output values
+ * Return whether the quadcopter is started.
+ * To start the quadcopter, move the left stick in bottom left corner then, move it back in center position.
+ * To stop the quadcopter move the left stick in bottom right corner.
+ *
+ * @return bool
  */
-void compensateBatteryDrop() {
-    if (isBatteryConnected()) {
-        pulse_length_esc1 += pulse_length_esc1 * ((1240 - battery_voltage) / (float) 3500);
-        pulse_length_esc2 += pulse_length_esc2 * ((1240 - battery_voltage) / (float) 3500);
-        pulse_length_esc3 += pulse_length_esc3 * ((1240 - battery_voltage) / (float) 3500);
-        pulse_length_esc4 += pulse_length_esc4 * ((1240 - battery_voltage) / (float) 3500);
+bool isStarted() {
+    // When left stick is moved in the bottom left corner
+    if (status == STOPPED && pulse_length[mode_mapping[YAW]] <= 1012 && isThrottleIdle()) {
+        status = STARTING;
     }
+
+    // When left stick is moved back in the center position
+    if (status == STARTING && isYawCentered() && isThrottleIdle()) {
+        status = STARTED;
+
+        // Reset PID controller's variables to prevent bump start
+        resetPidController();
+
+        resetGyroAngles();
+    }
+
+    // When left stick is moved in the bottom right corner
+    if (status == STARTED && pulse_length[mode_mapping[YAW]] >= 1988 && isThrottleIdle()) {
+        status = STOPPED;
+        // Make sure to always stop motors when status is STOPPED
+        stopAll();
+    }
+
+    return status == STARTED;
 }
 
 /**
@@ -616,6 +539,18 @@ bool isBatteryConnected() {
     battery_voltage = battery_voltage * 0.92 + (analogRead(A0) + 65) * 0.09853;
 
     return battery_voltage < 1240 && battery_voltage > 800;
+}
+
+/**
+ * Compensate battery drop applying a coefficient on output values
+ */
+void compensateBatteryDrop() {
+    if (isBatteryConnected()) {
+        pulse_length_esc1 += pulse_length_esc1 * ((1240 - battery_voltage) / (float) 3500);
+        pulse_length_esc2 += pulse_length_esc2 * ((1240 - battery_voltage) / (float) 3500);
+        pulse_length_esc3 += pulse_length_esc3 * ((1240 - battery_voltage) / (float) 3500);
+        pulse_length_esc4 += pulse_length_esc4 * ((1240 - battery_voltage) / (float) 3500);
+    }
 }
 
 void onReceiverChannelChange(uint8_t channel) {
@@ -645,4 +580,69 @@ void onChannel3Change() {
 
 void onChannel4Change() {
     onReceiverChannelChange(CHANNEL4);
+}
+
+/**
+ * Setup configuration
+ */
+void setup() {
+    initEscs();
+
+    // Start I2C communication
+    Wire.begin();
+    Wire.setClock(400000);
+
+    // Turn LED on during setup
+    pinMode(13, OUTPUT);
+    digitalWrite(13, HIGH);
+
+    setupMpu6050Registers();
+
+    calibrateMpu6050();
+
+    configureChannelMapping();
+
+    // Capture receiver pulse edges using the board's Arduino interrupt API.
+    for (uint8_t pin : RECEIVER_PINS) {
+        pinMode(pin, INPUT);
+    }
+    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL1]), onChannel1Change, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL2]), onChannel2Change, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL3]), onChannel3Change, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(RECEIVER_PINS[CHANNEL4]), onChannel4Change, CHANGE);
+
+    period = (1000000/FREQ) ; // Sampling period in µs
+
+    // Initialize loop_timer
+    loop_timer = micros();
+
+    // Turn LED off now setup is done
+    digitalWrite(13, LOW);
+}
+
+/**
+ * Main program loop
+ */
+void loop() {
+    // 1. First, read raw values from MPU-6050
+    readSensor();
+
+    // 2. Calculate angles from gyro & accelerometer's values
+    calculateAngles();
+
+    // 3. Calculate set points of PID controller
+    calculateSetPoints();
+
+    // 4. Calculate errors comparing angular motions to set points
+    calculateErrors();
+
+    if (isStarted()) {
+        // 5. Calculate motors speed with PID controller
+        pidController();
+
+        compensateBatteryDrop();
+    }
+
+    // 6. Apply motors speed
+    applyMotorSpeed();
 }
